@@ -2,12 +2,13 @@
 // ============================================
 // CONFIGURACIÓN DE LA BASE DE DATOS
 // ============================================
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'liga_mfm');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_PORT', getenv('DB_PORT') ?: '3306');
+define('DB_NAME', getenv('DB_NAME') ?: 'liga_mfm');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
 
-define('SITE_URL', 'http://localhost/ligamfm');
+define('SITE_URL', getenv('SITE_URL') ?: 'http://localhost/ligamfm');
 
 date_default_timezone_set('America/Bogota');
 
@@ -20,8 +21,9 @@ if (session_status() === PHP_SESSION_NONE) {
 // CONEXIÓN PDO
 // ============================================
 try {
+    $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";
     $conn = new PDO(
-        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+        $dsn,
         DB_USER,
         DB_PASS,
         [
