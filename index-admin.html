@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liga MFM - Administración</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="pageBody">
+    <!-- Background layer controlled by JS -->
+    <div id="pageBg" style="position:fixed;inset:0;z-index:-1;background:linear-gradient(135deg,#0a5f0a 0%,#1a7a1a 50%,#0a5f0a 100%);transition:background 0.4s ease;"></div>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <img src="Logo MFM.png" alt="Liga MFM" class="login-logo">
+            <h1>LIGA MFM</h1>
+            <p>Panel de Administración</p>
+            <form id="loginForm" onsubmit="login(event)">
+                <div class="form-group">
+                    <label>🔐 Contraseña de Administrador</label>
+                    <input type="password" id="adminPassword" placeholder="Ingresa la contraseña" required autofocus>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Ingresar</button>
+                <p style="color: #e94560; margin-top: 15px; font-size: 0.9em; display: none;" id="loginError">❌ Contraseña incorrecta</p>
+            </form>
+            <p style="margin-top: 20px; font-size: 0.85em; color: #999;">
+                💡 Contraseña dada <strong></strong><br>
+                Para cambiarla comuníquense con el creador
+            </p>
+        </div>
+    </div>
+
+    <!-- Main App (hidden until login) -->
+    <div id="mainApp" style="display: none;">
+        <div class="container">
+            <div class="header" id="mainHeader">
+                <!-- Editable Logo -->
+                <div class="header-logo-wrapper" onclick="triggerLogoEdit()" title="Clic para cambiar el escudo">
+                    <img src="" alt="Liga MFM" class="header-logo" id="mainLogo">
+                    <div class="logo-edit-overlay">📷 Cambiar</div>
+                    <input type="file" id="inlineLogoInput" class="file-upload-input" accept="image/*" onchange="applyInlineLogo(this)">
+                </div>
+                <!-- Editable Texts -->
+                <div class="header-text">
+                    <h1 id="headerLeagueName"
+                        contenteditable="true"
+                        spellcheck="false"
+                        title="Clic para editar el nombre"
+                        onblur="saveInlineName()"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">LIGA MFM</h1>
+                    <p id="headerLeagueSubtitle"
+                       contenteditable="true"
+                       spellcheck="false"
+                       title="Clic para editar el subtítulo"
+                       onblur="saveInlineSubtitle()"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">MICRO FÚTBOL MONTECRISTO</p>
+                </div>
+                <button class="btn btn-danger logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="showSection('partidos')">⚽ Partidos</button>
+                <button class="tab" onclick="showSection('posiciones')">🏆 Posiciones</button>
+                <button class="tab" onclick="showSection('estadisticas')">👟 Goleadores</button>
+                <button class="tab" onclick="showSection('fasefinal')">🏅 Fase Final</button>
+                <button class="tab" onclick="showSection('configuracion')">⚙️ Configuración</button>
+            </div>
+
+            <div class="content">
+                <!-- PARTIDOS SECTION -->
+                <section id="partidos" class="section active">
+                    <h2 class="section-title">⚽ PRÓXIMOS PARTIDOS</h2>
+                    <div id="matches-container" class="matches-grid"></div>
+                </section>
+
+                <!-- POSICIONES SECTION -->
+                <section id="posiciones" class="section">
+                    <h2 class="section-title">🏆 TABLA DE POSICIONES - TEMPORADA 2025-26</h2>
+                    <div style="overflow-x: auto;">
+                        <table class="standings-table">
+                            <thead>
+                                <tr>
+                                    <th class="center">#</th>
+                                    <th>Equipo</th>
+                                    <th class="center" title="Partidos Jugados">PJ</th>
+                                    <th class="center" title="Ganados">G</th>
+                                    <th class="center" title="Empatados">E</th>
+                                    <th class="center" title="Perdidos">P</th>
+                                    <th class="center" title="Goles a Favor">GF</th>
+                                    <th class="center" title="Goles en Contra">GC</th>
+                                    <th class="center" title="Diferencia de Goles">DG</th>
+                                    <th class="center">Pts</th>
+                                    <th class="center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="standings-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- GOLEADORES SECTION -->
+                <section id="estadisticas" class="section">
+                    <h2 class="section-title">👟 TABLA DE GOLEADORES</h2>
+                    <div style="overflow-x: auto;">
+                        <table class="standings-table">
+                            <thead>
+                                <tr>
+                                    <th class="center">#</th>
+                                    <th>Jugador</th>
+                                    <th>Equipo</th>
+                                    <th class="center">Goles</th>
+                                    <th class="center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scorers-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- FASE FINAL SECTION -->
+                <section id="fasefinal" class="section">
+                    <h2 class="section-title">🏅 FASE FINAL</h2>
+                    <div id="bracket-admin-info" style="background:rgba(212,175,55,0.1);border:2px solid var(--accent);border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
+                        <p style="font-size:1em;color:var(--primary);font-weight:600;">⚙️ Configura los partidos de la Fase Final usando el panel de abajo. Los resultados se mostrarán en el bracket público.</p>
+                    </div>
+                    <div id="bracket-admin-container"></div>
+                    <div style="margin-top:24px;text-align:center;">
+                        <button class="btn btn-primary" onclick="openPlayoffModal()" style="font-size:1em;padding:14px 32px;">➕ Agregar Partido de Fase Final</button>
+                    </div>
+                </section>
+
+                <!-- CONFIGURACIÓN SECTION -->
+                <section id="configuracion" class="section">
+                    <h2 class="section-title">⚙️ CONFIGURACIÓN DE LA LIGA</h2>
+                    <div class="config-grid">
+                        <!-- Logo -->
+                        <div class="config-card">
+                            <h3 class="config-card-title">🖼️ Logo de la Liga</h3>
+                            <div style="text-align:center;margin-bottom:20px;">
+                                <img id="configLogoPreview" src="Logo MFM.png" alt="Logo" style="width:130px;height:130px;object-fit:contain;border-radius:12px;border:3px solid var(--accent);padding:8px;background:var(--light);">
+                            </div>
+                            <label for="configLogoInput" class="file-upload-label">📁 Cambiar Logo</label>
+                            <input type="file" id="configLogoInput" class="file-upload-input" accept="image/*" onchange="previewConfigLogo(this)">
+                            <button class="btn btn-primary" style="width:100%;margin-top:15px;" onclick="saveConfigLogo()">💾 Guardar Logo</button>
+                        </div>
+                        <!-- Nombre -->
+                        <div class="config-card">
+                            <h3 class="config-card-title">✏️ Nombre de la Liga</h3>
+                            <div class="form-group">
+                                <label>Título Principal</label>
+                                <input type="text" id="configLeagueName" placeholder="Ej: LIGA MFM" maxlength="30">
+                            </div>
+                            <div class="form-group">
+                                <label>Subtítulo</label>
+                                <input type="text" id="configLeagueSubtitle" placeholder="Ej: MICRO FÚTBOL MONTECRISTO" maxlength="50">
+                            </div>
+                            <div class="form-group">
+                                <label>Temporada</label>
+                                <input type="text" id="configSeason" placeholder="Ej: 2025-26" maxlength="20">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="saveConfigNames()">💾 Guardar Nombres</button>
+                        </div>
+                        <!-- Colores -->
+                        <div class="config-card">
+                            <h3 class="config-card-title">🎨 Colores de la Liga</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Color Principal</label>
+                                    <div style="display:flex;align-items:center;gap:10px;">
+                                        <input type="color" id="configColorPrimary" value="#0a5f0a" style="width:55px;height:44px;border:2px solid var(--border);border-radius:8px;cursor:pointer;padding:3px;" oninput="syncColorFromPicker('configColorPrimary','configColorPrimaryHex')">
+                                        <input type="text" id="configColorPrimaryHex" value="#0a5f0a" placeholder="#0a5f0a" style="flex:1;" oninput="syncColor('configColorPrimary','configColorPrimaryHex')">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Color Secundario</label>
+                                    <div style="display:flex;align-items:center;gap:10px;">
+                                        <input type="color" id="configColorSecondary" value="#1a7a1a" style="width:55px;height:44px;border:2px solid var(--border);border-radius:8px;cursor:pointer;padding:3px;" oninput="syncColorFromPicker('configColorSecondary','configColorSecondaryHex')">
+                                        <input type="text" id="configColorSecondaryHex" value="#1a7a1a" placeholder="#1a7a1a" style="flex:1;" oninput="syncColor('configColorSecondary','configColorSecondaryHex')">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Color Acento</label>
+                                    <div style="display:flex;align-items:center;gap:10px;">
+                                        <input type="color" id="configColorAccent" value="#d4af37" style="width:55px;height:44px;border:2px solid var(--border);border-radius:8px;cursor:pointer;padding:3px;" oninput="syncColorFromPicker('configColorAccent','configColorAccentHex')">
+                                        <input type="text" id="configColorAccentHex" value="#d4af37" placeholder="#d4af37" style="flex:1;" oninput="syncColor('configColorAccent','configColorAccentHex')">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Color Resaltado</label>
+                                    <div style="display:flex;align-items:center;gap:10px;">
+                                        <input type="color" id="configColorHighlight" value="#c41e3a" style="width:55px;height:44px;border:2px solid var(--border);border-radius:8px;cursor:pointer;padding:3px;" oninput="syncColorFromPicker('configColorHighlight','configColorHighlightHex')">
+                                        <input type="text" id="configColorHighlightHex" value="#c41e3a" placeholder="#c41e3a" style="flex:1;" oninput="syncColor('configColorHighlight','configColorHighlightHex')">
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="colorPreviewBar" style="height:30px;border-radius:8px;margin:10px 0;background:linear-gradient(90deg,#0a5f0a,#1a7a1a,#d4af37,#c41e3a);border:2px solid var(--border);"></div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="saveConfigColors()">💾 Guardar Colores</button>
+                        </div>
+                        <!-- Restablecer -->
+                        <div class="config-card" style="background:linear-gradient(135deg,rgba(196,30,58,0.05),rgba(196,30,58,0.1));border-color:rgba(196,30,58,0.3);">
+                            <h3 class="config-card-title" style="color:var(--highlight);">🔄 Restablecer</h3>
+                            <p style="color:#666;margin-bottom:20px;font-size:0.95em;">Restaura todos los colores y nombres al diseño original de la Liga MFM.</p>
+                            <button class="btn btn-danger" style="width:100%;" onclick="resetConfig()">🔄 Restablecer todo al original</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Add Button -->
+        <button class="add-btn" onclick="openAddModal()" title="Agregar">+</button>
+
+        <!-- Color Palette Button -->
+        <button class="color-palette-btn" onclick="toggleColorPanel()" title="🎨 Cambiar colores">🎨</button>
+
+        <!-- Floating Color Panel -->
+        <div id="floatingColorPanel" class="floating-color-panel" style="display:none;">
+            <div class="fcp-header">
+                <span>🎨 Colores de la Liga</span>
+                <button onclick="toggleColorPanel()" style="background:none;border:none;color:white;font-size:1.2em;cursor:pointer;">✕</button>
+            </div>
+            <div class="fcp-body">
+                <div class="fcp-row">
+                    <label>Principal</label>
+                    <input type="color" id="fcpPrimary" value="#0a5f0a" oninput="liveColorPreview()">
+                    <input type="text" id="fcpPrimaryHex" value="#0a5f0a" oninput="syncFcpHex('fcpPrimary','fcpPrimaryHex')">
+                </div>
+                <div class="fcp-row">
+                    <label>Secundario</label>
+                    <input type="color" id="fcpSecondary" value="#1a7a1a" oninput="liveColorPreview()">
+                    <input type="text" id="fcpSecondaryHex" value="#1a7a1a" oninput="syncFcpHex('fcpSecondary','fcpSecondaryHex')">
+                </div>
+                <div class="fcp-row">
+                    <label>Acento</label>
+                    <input type="color" id="fcpAccent" value="#d4af37" oninput="liveColorPreview()">
+                    <input type="text" id="fcpAccentHex" value="#d4af37" oninput="syncFcpHex('fcpAccent','fcpAccentHex')">
+                </div>
+                <div class="fcp-row">
+                    <label>Resaltado</label>
+                    <input type="color" id="fcpHighlight" value="#c41e3a" oninput="liveColorPreview()">
+                    <input type="text" id="fcpHighlightHex" value="#c41e3a" oninput="syncFcpHex('fcpHighlight','fcpHighlightHex')">
+                </div>
+                <div id="fcpPreviewBar" style="height:18px;border-radius:6px;margin:12px 0 0;background:linear-gradient(90deg,#0a5f0a,#1a7a1a,#d4af37,#c41e3a);"></div>
+                <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button class="btn btn-danger btn-small" style="flex:1;" onclick="resetFcpColors()">↩ Reset</button>
+                    <button class="btn btn-success btn-small" style="flex:1;" onclick="saveFcpColors()">💾 Guardar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Matches -->
+        <div id="matchModal" class="modal">
+            <div class="modal-content">
+                <h3 class="modal-header">⚽ Gestionar Partido</h3>
+                <form id="matchForm" onsubmit="saveMatch(event)">
+                    <input type="hidden" id="matchId">
+                    
+                    <div class="form-group">
+                        <label>📅 Fecha del Partido</label>
+                        <input type="date" id="matchDate" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🕐 Hora del Partido</label>
+                        <input type="time" id="matchTime" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>🏠 Equipo Local</label>
+                            <input type="text" id="homeTeam" placeholder="Nombre del equipo" required>
+                        </div>
+                        <div class="form-group">
+                            <label>✈️ Equipo Visitante</label>
+                            <input type="text" id="awayTeam" placeholder="Nombre del equipo" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Escudo Equipo Local</label>
+                            <label for="homeLogoInput" class="file-upload-label">
+                                📁 Seleccionar Imagen
+                            </label>
+                            <input type="file" id="homeLogoInput" class="file-upload-input" accept="image/*" onchange="previewLogo(this, 'homeLogoPreview')">
+                            <img id="homeLogoPreview" class="preview-image" style="display: none;">
+                        </div>
+                        <div class="form-group">
+                            <label>Escudo Equipo Visitante</label>
+                            <label for="awayLogoInput" class="file-upload-label">
+                                📁 Seleccionar Imagen
+                            </label>
+                            <input type="file" id="awayLogoInput" class="file-upload-input" accept="image/*" onchange="previewLogo(this, 'awayLogoPreview')">
+                            <img id="awayLogoPreview" class="preview-image" style="display: none;">
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-danger" onclick="closeModal('matchModal')">❌ Cancelar</button>
+                        <button type="submit" class="btn btn-success">💾 Guardar Partido</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for Teams -->
+        <div id="teamModal" class="modal">
+            <div class="modal-content">
+                <h3 class="modal-header">🏆 Gestionar Equipo</h3>
+                <form id="teamForm" onsubmit="saveTeam(event)">
+                    <input type="hidden" id="teamId">
+                    
+                    <div class="form-group">
+                        <label>Nombre del Equipo</label>
+                        <input type="text" id="teamName" placeholder="Ej: Real Madrid" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Escudo del Equipo</label>
+                        <label for="teamLogoInput" class="file-upload-label">
+                            📁 Seleccionar Escudo
+                        </label>
+                        <input type="file" id="teamLogoInput" class="file-upload-input" accept="image/*" onchange="previewLogo(this, 'teamLogoPreview')">
+                        <img id="teamLogoPreview" class="preview-image" style="display: none;">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>PJ (Partidos Jugados)</label>
+                            <input type="number" id="teamPJ" min="0" value="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>G (Ganados)</label>
+                            <input type="number" id="teamG" min="0" value="0" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>E (Empatados)</label>
+                            <input type="number" id="teamE" min="0" value="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>P (Perdidos)</label>
+                            <input type="number" id="teamP" min="0" value="0" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>GF (Goles a Favor)</label>
+                            <input type="number" id="teamGF" min="0" value="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>GC (Goles en Contra)</label>
+                            <input type="number" id="teamGC" min="0" value="0" required>
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-danger" onclick="closeModal('teamModal')">❌ Cancelar</button>
+                        <button type="submit" class="btn btn-success">💾 Guardar Equipo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for Scorers -->
+        <div id="scorerModal" class="modal">
+            <div class="modal-content">
+                <h3 class="modal-header">👟 Gestionar Goleador</h3>
+                <form id="scorerForm" onsubmit="saveScorer(event)">
+                    <input type="hidden" id="scorerId">
+                    
+                    <div class="form-group">
+                        <label>Nombre del Jugador</label>
+                        <input type="text" id="scorerName" placeholder="Ej: Lionel Messi" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Equipo</label>
+                        <input type="text" id="scorerTeam" placeholder="Ej: Barcelona FC" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Cantidad de Goles</label>
+                        <input type="number" id="scorerGoals" min="0" value="0" required>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-danger" onclick="closeModal('scorerModal')">❌ Cancelar</button>
+                        <button type="submit" class="btn btn-success">💾 Guardar Goleador</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYOFF MODAL -->
+    <div id="playoffModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🏅 Partido de Fase Final</h2>
+                <button class="modal-close" onclick="closeModal('playoffModal')">×</button>
+            </div>
+            <form id="playoffForm" onsubmit="savePlayoff(event)">
+                <input type="hidden" id="playoffId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ronda</label>
+                        <select id="playoffRound" required style="width:100%;padding:12px;border:2px solid var(--border);border-radius:8px;font-size:1em;">
+                            <option value="">Seleccionar ronda</option>
+                            <option value="Octavos de Final">Octavos de Final</option>
+                            <option value="Cuartos de Final">Cuartos de Final</option>
+                            <option value="Semifinal">Semifinal</option>
+                            <option value="Final">Final</option>
+                            <option value="Tercer Puesto">Tercer Puesto</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Número de Partido</label>
+                        <input type="number" id="playoffMatchNum" placeholder="Ej: 1" min="1" max="8" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha</label>
+                        <input type="date" id="playoffDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Hora</label>
+                        <input type="time" id="playoffTime">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Equipo Local</label>
+                        <input type="text" id="playoffHome" placeholder="Nombre o Por definir" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Equipo Visitante</label>
+                        <input type="text" id="playoffAway" placeholder="Nombre o Por definir" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Goles Local</label>
+                        <input type="number" id="playoffHomeGoals" placeholder="-" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Goles Visitante</label>
+                        <input type="number" id="playoffAwayGoals" placeholder="-" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Estado</label>
+                    <select id="playoffStatus" style="width:100%;padding:12px;border:2px solid var(--border);border-radius:8px;font-size:1em;">
+                        <option value="pendiente">⏳ Por jugar</option>
+                        <option value="en_juego">🔴 En juego</option>
+                        <option value="finalizado">✅ Finalizado</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" onclick="closeModal('playoffModal')">❌ Cancelar</button>
+                    <button type="submit" class="btn btn-success">💾 Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script-admin.js"></script>
+</body>
+</html>
