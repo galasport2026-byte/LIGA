@@ -20,14 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $p    = (int)($_POST['p']  ?? 0);
         $gf   = (int)($_POST['gf'] ?? 0);
         $gc   = (int)($_POST['gc'] ?? 0);
-        if (!$name) { $err = 'El nombre del equipo es obligatorio.'; }
-        else {
+        if (!$name) {
+            $err = 'El nombre del equipo es obligatorio.';
+        } else {
             if ($accion === 'agregar_equipo') {
+                // CORRECCIÓN: dg y pts son columnas GENERATED, NO se incluyen en el INSERT
                 $conn->prepare("INSERT INTO tabla (name,logo,pj,g,e,p,gf,gc) VALUES (?,?,?,?,?,?,?,?)")
                      ->execute([$name,$logo,$pj,$g,$e,$p,$gf,$gc]);
                 $msg = "✅ Equipo '$name' agregado.";
             } else {
                 $id = (int)$_POST['id'];
+                // CORRECCIÓN: dg y pts son columnas GENERATED, NO se incluyen en el UPDATE
                 $conn->prepare("UPDATE tabla SET name=?,logo=?,pj=?,g=?,e=?,p=?,gf=?,gc=? WHERE id=?")
                      ->execute([$name,$logo,$pj,$g,$e,$p,$gf,$gc,$id]);
                 $msg = "✅ Equipo actualizado.";
@@ -41,22 +44,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ---------- PARTIDOS ----------
     if ($accion === 'agregar_partido' || $accion === 'editar_partido') {
-        $hl   = trim($_POST['home_team'] ?? '');
-        $vl   = trim($_POST['away_team'] ?? '');
-        $fd   = trim($_POST['match_date'] ?? '');
-        $fh   = trim($_POST['match_time'] ?? '');
-        $hlog = trim($_POST['home_logo']  ?? '');
-        $alog = trim($_POST['away_logo']  ?? '');
-        if (!$hl || !$vl || !$fd || !$fh) { $err = 'Completa todos los campos del partido.'; }
-        else {
+        $hl         = trim($_POST['home_team']  ?? '');
+        $vl         = trim($_POST['away_team']  ?? '');
+        $fd         = trim($_POST['match_date'] ?? '');
+        $fh         = trim($_POST['match_time'] ?? '');
+        $hlog       = trim($_POST['home_logo']  ?? '');
+        $alog       = trim($_POST['away_logo']  ?? '');
+        // CORRECCIÓN: manejar status y marcadores que existen en la tabla partidos
+        $status     = trim($_POST['status']     ?? 'programado');
+        $home_score = $_POST['home_score'] !== '' ? (int)$_POST['home_score'] : null;
+        $away_score = $_POST['away_score'] !== '' ? (int)$_POST['away_score'] : null;
+
+        if (!$hl || !$vl || !$fd || !$fh) {
+            $err = 'Completa todos los campos del partido.';
+        } else {
             if ($accion === 'agregar_partido') {
-                $conn->prepare("INSERT INTO partidos (home_team,away_team,match_date,match_time,home_logo,away_logo) VALUES (?,?,?,?,?,?)")
-                     ->execute([$hl,$vl,$fd,$fh,$hlog,$alog]);
+                $conn->prepare("INSERT INTO partidos (home_team,away_team,match_date,match_time,home_logo,away_logo,status,home_score,away_score) VALUES (?,?,?,?,?,?,?,?,?)")
+                     ->execute([$hl,$vl,$fd,$fh,$hlog,$alog,$status,$home_score,$away_score]);
                 $msg = "✅ Partido agregado.";
             } else {
                 $id = (int)$_POST['id'];
-                $conn->prepare("UPDATE partidos SET home_team=?,away_team=?,match_date=?,match_time=?,home_logo=?,away_logo=? WHERE id=?")
-                     ->execute([$hl,$vl,$fd,$fh,$hlog,$alog,$id]);
+                $conn->prepare("UPDATE partidos SET home_team=?,away_team=?,match_date=?,match_time=?,home_logo=?,away_logo=?,status=?,home_score=?,away_score=? WHERE id=?")
+                     ->execute([$hl,$vl,$fd,$fh,$hlog,$alog,$status,$home_score,$away_score,$id]);
                 $msg = "✅ Partido actualizado.";
             }
         }
@@ -71,8 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pn = trim($_POST['player_name'] ?? '');
         $tn = trim($_POST['team_name']   ?? '');
         $gl = (int)($_POST['goals'] ?? 0);
-        if (!$pn || !$tn) { $err = 'Completa nombre del jugador y equipo.'; }
-        else {
+        if (!$pn || !$tn) {
+            $err = 'Completa nombre del jugador y equipo.';
+        } else {
             if ($accion === 'agregar_goleador') {
                 $conn->prepare("INSERT INTO goleadores (player_name,team_name,goals) VALUES (?,?,?)")
                      ->execute([$pn,$tn,$gl]);
@@ -98,11 +108,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $away    = trim($_POST['equipo_visita'] ?? '');
         $fecha   = trim($_POST['fecha']         ?? '') ?: null;
         $hora    = trim($_POST['hora']          ?? '') ?: null;
-        $hg      = $_POST['goles_local']  !== '' ? (int)$_POST['goles_local']  : null;
-        $ag      = $_POST['goles_visita'] !== '' ? (int)$_POST['goles_visita'] : null;
+        $hg      = (isset($_POST['goles_local'])  && $_POST['goles_local']  !== '') ? (int)$_POST['goles_local']  : null;
+        $ag      = (isset($_POST['goles_visita']) && $_POST['goles_visita'] !== '') ? (int)$_POST['goles_visita'] : null;
         $estado  = trim($_POST['estado']        ?? 'pendiente');
-        if (!$ronda || !$home || !$away) { $err = 'Completa ronda y equipos.'; }
-        else {
+        if (!$ronda || !$home || !$away) {
+            $err = 'Completa ronda y equipos.';
+        } else {
             if ($accion === 'agregar_playoff') {
                 $conn->prepare("INSERT INTO fase_final (ronda,num_partido,equipo_local,equipo_visita,fecha,hora,goles_local,goles_visita,estado) VALUES (?,?,?,?,?,?,?,?,?)")
                      ->execute([$ronda,$num,$home,$away,$fecha,$hora,$hg,$ag,$estado]);
@@ -135,6 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ============================================
 // CARGAR DATOS
+// CORRECCIÓN: usar nombres reales de tablas (tabla, partidos, goleadores)
 // ============================================
 $teams   = $conn->query("SELECT * FROM tabla    ORDER BY pts DESC, dg DESC")->fetchAll();
 $matches = $conn->query("SELECT * FROM partidos ORDER BY match_date ASC, match_time ASC")->fetchAll();
@@ -156,7 +168,6 @@ if ($eTeam)    $panelActivo = 'equipos';
 if ($eMatch)   $panelActivo = 'partidos';
 if ($eScorer)  $panelActivo = 'goleadores';
 if ($ePlayoff) $panelActivo = 'fasefinal';
-
 
 $color1   = $cfg['color_primary']   ?? '#0a5f0a';
 $color2   = $cfg['color_secondary'] ?? '#1a7a1a';
@@ -331,15 +342,16 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                             value="<?= limpiar($eTeam['logo'] ?? '') ?>">
                     </div>
                 </div>
-                <div class="fgrid c4">
-                    <?php foreach (['pj'=>'PJ','g'=>'G','e'=>'E','p'=>'P','gf'=>'GF','gc'=>'GC'] as $f=>$lbl): ?>
+                <!-- CORRECCIÓN: solo los campos editables (dg y pts se calculan solos en la BD) -->
+                <div class="fgrid c3">
+                    <?php foreach (['pj'=>'PJ — Partidos Jugados','g'=>'G — Ganados','e'=>'E — Empatados','p'=>'P — Perdidos','gf'=>'GF — Goles a Favor','gc'=>'GC — Goles en Contra'] as $f=>$lbl): ?>
                     <div class="fg">
                         <label><?= $lbl ?></label>
                         <input type="number" name="<?= $f ?>" min="0" value="<?= $eTeam[$f] ?? 0 ?>">
                     </div>
                     <?php endforeach; ?>
                 </div>
-                <p style="font-size:.78em;color:#aaa;margin-top:6px;">* DG y Pts se calculan automáticamente (DG = GF−GC · Pts = G×3+E)</p>
+                <p style="font-size:.78em;color:#aaa;margin-top:8px;">⚡ <strong>DG</strong> (Diferencia de Goles) y <strong>Pts</strong> (Puntos) se calculan <em>automáticamente</em> por la base de datos.</p>
                 <div class="facciones">
                     <button type="submit" class="btn btn-prim"><?= $eTeam?'💾 Guardar cambios':'➕ Agregar equipo' ?></button>
                     <?php if ($eTeam): ?><a href="?panel=equipos" class="btn btn-sec">✖ Cancelar</a><?php endif; ?>
@@ -361,7 +373,7 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                     <tr>
                         <td><?= $i+1 ?></td>
                         <td>
-                            <?php if ($t['logo']): ?><img src="<?= limpiar($t['logo']) ?>" style="width:26px;height:26px;object-fit:contain;border-radius:4px;vertical-align:middle;margin-right:6px;"><?php endif; ?>
+                            <?php if ($t['logo']): ?><img src="<?= limpiar($t['logo']) ?>" style="width:26px;height:26px;object-fit:contain;border-radius:4px;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none'"><?php endif; ?>
                             <strong><?= limpiar($t['name']) ?></strong>
                         </td>
                         <td><?= $t['pj'] ?></td><td><?= $t['g'] ?></td><td><?= $t['e'] ?></td><td><?= $t['p'] ?></td>
@@ -401,12 +413,12 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                 <div class="fgrid" style="margin-bottom:14px;">
                     <div class="fg">
                         <label>Equipo Local *</label>
-                        <input type="text" name="home_team" required placeholder="Ej: Deportivo Montecristo"
+                        <input type="text" name="home_team" required placeholder="Ej: Caporo"
                             value="<?= limpiar($eMatch['home_team'] ?? '') ?>">
                     </div>
                     <div class="fg">
                         <label>Equipo Visitante *</label>
-                        <input type="text" name="away_team" required placeholder="Ej: Atlético La Colina"
+                        <input type="text" name="away_team" required placeholder="Ej: Bad Boys"
                             value="<?= limpiar($eMatch['away_team'] ?? '') ?>">
                     </div>
                     <div class="fg">
@@ -429,6 +441,25 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                         <input type="time" name="match_time" required
                             value="<?= $eMatch['match_time'] ?? '' ?>">
                     </div>
+                    <!-- CORRECCIÓN: agregar campo status que existe en la tabla partidos -->
+                    <div class="fg">
+                        <label>Estado</label>
+                        <select name="status">
+                            <?php foreach (['programado'=>'📅 Programado','en_vivo'=>'🔴 En vivo','finalizado'=>'✅ Finalizado'] as $v=>$l): ?>
+                            <option value="<?= $v ?>" <?= ($eMatch['status']??'programado')===$v?'selected':'' ?>><?= $l ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="fg" style="grid-column:span 1;">
+                        <label>Marcador (solo si hay resultado)</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input type="number" name="home_score" min="0" placeholder="Local"
+                                value="<?= $eMatch['home_score'] ?? '' ?>" style="width:80px;">
+                            <span style="font-weight:700;color:#999;">–</span>
+                            <input type="number" name="away_score" min="0" placeholder="Visit."
+                                value="<?= $eMatch['away_score'] ?? '' ?>" style="width:80px;">
+                        </div>
+                    </div>
                 </div>
                 <div class="facciones">
                     <button type="submit" class="btn btn-prim"><?= $eMatch?'💾 Guardar cambios':'➕ Agregar partido' ?></button>
@@ -442,24 +473,29 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
         <div class="card-head"><h2>📋 PARTIDOS (<?= count($matches) ?>)</h2></div>
         <div style="overflow-x:auto;">
             <table class="dtbl">
-                <thead><tr><th>Fecha</th><th>Hora</th><th>Local</th><th>Visitante</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>Fecha</th><th>Hora</th><th>Local</th><th>Visitante</th><th>Marcador</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody>
                 <?php if (empty($matches)): ?>
-                    <tr><td colspan="6" style="text-align:center;padding:30px;color:#aaa;">No hay partidos.</td></tr>
+                    <tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">No hay partidos.</td></tr>
                 <?php else: ?>
                     <?php foreach ($matches as $m): ?>
                     <tr>
                         <td><?= date('d/m/Y', strtotime($m['match_date'])) ?></td>
                         <td><?= date('H:i',   strtotime($m['match_time'])) ?></td>
                         <td>
-                            <?php if ($m['home_logo']): ?><img src="<?= limpiar($m['home_logo']) ?>" style="width:22px;height:22px;vertical-align:middle;object-fit:contain;margin-right:4px;"><?php endif; ?>
+                            <?php if ($m['home_logo']): ?><img src="<?= limpiar($m['home_logo']) ?>" style="width:22px;height:22px;vertical-align:middle;object-fit:contain;margin-right:4px;" onerror="this.style.display='none'"><?php endif; ?>
                             <?= limpiar($m['home_team']) ?>
                         </td>
                         <td>
-                            <?php if ($m['away_logo']): ?><img src="<?= limpiar($m['away_logo']) ?>" style="width:22px;height:22px;vertical-align:middle;object-fit:contain;margin-right:4px;"><?php endif; ?>
+                            <?php if ($m['away_logo']): ?><img src="<?= limpiar($m['away_logo']) ?>" style="width:22px;height:22px;vertical-align:middle;object-fit:contain;margin-right:4px;" onerror="this.style.display='none'"><?php endif; ?>
                             <?= limpiar($m['away_team']) ?>
                         </td>
-                        <td><span style="background:<?= $m['status']==='finalizado'?'#22c55e':($m['status']==='en_vivo'?'#f59e0b':'#6b7280') ?>;color:#fff;padding:3px 10px;border-radius:20px;font-size:.8em;font-weight:700;"><?= ucfirst($m['status']) ?></span></td>
+                        <!-- CORRECCIÓN: mostrar marcador home_score / away_score -->
+                        <td style="text-align:center;font-family:'Oswald',sans-serif;font-size:1.1em;font-weight:700;">
+                            <?= ($m['home_score'] !== null) ? $m['home_score'].' – '.$m['away_score'] : '–' ?>
+                        </td>
+                        <!-- CORRECCIÓN: status correcto es 'programado' no 'pendiente' -->
+                        <td><span style="background:<?= $m['status']==='finalizado'?'#22c55e':($m['status']==='en_vivo'?'#f59e0b':'#6b7280') ?>;color:#fff;padding:3px 10px;border-radius:20px;font-size:.8em;font-weight:700;"><?= $m['status']==='programado'?'📅 Programado':($m['status']==='en_vivo'?'🔴 En vivo':'✅ Finalizado') ?></span></td>
                         <td>
                             <div class="acts">
                                 <a href="?em=<?= $m['id'] ?>" class="bxs edit">✏️ Editar</a>
@@ -498,8 +534,15 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                     </div>
                     <div class="fg">
                         <label>Equipo *</label>
-                        <input type="text" name="team_name" required placeholder="Ej: Deportivo Montecristo"
+                        <!-- CORRECCIÓN: selector con equipos existentes + opción libre -->
+                        <input type="text" name="team_name" required placeholder="Ej: Caporo"
+                            list="lista-equipos"
                             value="<?= limpiar($eScorer['team_name'] ?? '') ?>">
+                        <datalist id="lista-equipos">
+                            <?php foreach ($teams as $t): ?>
+                            <option value="<?= limpiar($t['name']) ?>">
+                            <?php endforeach; ?>
+                        </datalist>
                     </div>
                     <div class="fg">
                         <label>Goles</label>
@@ -554,6 +597,7 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
 <div class="panel <?= $panelActivo==='fasefinal'?'active':'' ?>">
     <div class="card">
         <div class="card-head"><h2><?= $ePlayoff ? '✏️ EDITAR PARTIDO' : '➕ AGREGAR PARTIDO — FASE FINAL' ?></h2></div>
+        <div class="card-body">
         <form method="POST" action="?panel=fasefinal">
             <?php if ($ePlayoff): ?>
                 <input type="hidden" name="id"     value="<?= $ePlayoff['id'] ?>">
@@ -561,10 +605,10 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
             <?php else: ?>
                 <input type="hidden" name="accion" value="agregar_playoff">
             <?php endif; ?>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-                <div>
+            <div class="fgrid">
+                <div class="fg">
                     <label>Ronda *</label>
-                    <select name="ronda" required style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <select name="ronda" required>
                         <?php
                         $rondas = ['Octavos de Final','Cuartos de Final','Semifinal','Tercer Puesto','Final'];
                         foreach ($rondas as $r):
@@ -574,76 +618,89 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div>
+                <div class="fg">
                     <label>N° Partido</label>
-                    <input type="number" name="num_partido" min="1" max="8" value="<?= $ePlayoff['num_partido'] ?? 1 ?>" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <input type="number" name="num_partido" min="1" max="8" value="<?= $ePlayoff['num_partido'] ?? 1 ?>">
                 </div>
-                <div>
+                <div class="fg">
                     <label>Equipo Local *</label>
-                    <input type="text" name="equipo_local" required placeholder="Nombre o 'Por definir'" value="<?= htmlspecialchars($ePlayoff['equipo_local'] ?? '') ?>" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <input type="text" name="equipo_local" required placeholder="Nombre o 'Por definir'"
+                        list="lista-equipos-ff"
+                        value="<?= htmlspecialchars($ePlayoff['equipo_local'] ?? '') ?>">
                 </div>
-                <div>
+                <div class="fg">
                     <label>Equipo Visitante *</label>
-                    <input type="text" name="equipo_visita" required placeholder="Nombre o 'Por definir'" value="<?= htmlspecialchars($ePlayoff['equipo_visita'] ?? '') ?>" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <input type="text" name="equipo_visita" required placeholder="Nombre o 'Por definir'"
+                        list="lista-equipos-ff"
+                        value="<?= htmlspecialchars($ePlayoff['equipo_visita'] ?? '') ?>">
                 </div>
-                <div>
+                <datalist id="lista-equipos-ff">
+                    <option value="Por definir">
+                    <?php foreach ($teams as $t): ?>
+                    <option value="<?= limpiar($t['name']) ?>">
+                    <?php endforeach; ?>
+                </datalist>
+                <div class="fg">
                     <label>Goles Local</label>
-                    <input type="number" name="goles_local" min="0" placeholder="-" value="<?= $ePlayoff['goles_local'] ?? '' ?>" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <input type="number" name="goles_local" min="0" placeholder="–"
+                        value="<?= $ePlayoff['goles_local'] ?? '' ?>">
                 </div>
-                <div>
+                <div class="fg">
                     <label>Goles Visitante</label>
-                    <input type="number" name="goles_visita" min="0" placeholder="-" value="<?= $ePlayoff['goles_visita'] ?? '' ?>" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <input type="number" name="goles_visita" min="0" placeholder="–"
+                        value="<?= $ePlayoff['goles_visita'] ?? '' ?>">
                 </div>
-                <div>
+                <div class="fg">
                     <label>Fecha</label>
-                    <input type="date" name="fecha" value="<?= $ePlayoff['fecha'] ?? '' ?>" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <input type="date" name="fecha" value="<?= $ePlayoff['fecha'] ?? '' ?>">
                 </div>
-                <div>
+                <div class="fg">
                     <label>Hora</label>
-                    <input type="time" name="hora" value="<?= $ePlayoff['hora'] ?? '' ?>" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <input type="time" name="hora" value="<?= $ePlayoff['hora'] ?? '' ?>">
                 </div>
-                <div>
+                <div class="fg">
                     <label>Estado</label>
-                    <select name="estado" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:1em;margin-top:6px;">
+                    <select name="estado">
                         <?php foreach (['pendiente'=>'⏳ Por jugar','en_juego'=>'🔴 En juego','finalizado'=>'✅ Finalizado'] as $v=>$l): ?>
                         <option value="<?= $v ?>" <?= ($ePlayoff['estado']??'pendiente')===$v?'selected':'' ?>><?= $l ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
             </div>
-            <div style="margin-top:20px;display:flex;gap:12px;">
+            <div class="facciones" style="margin-top:18px;">
                 <button type="submit" class="btn btn-prim"><?= $ePlayoff ? '💾 Guardar cambios' : '➕ Agregar partido' ?></button>
                 <?php if ($ePlayoff): ?><a href="?panel=fasefinal" class="btn btn-sec">✖ Cancelar</a><?php endif; ?>
             </div>
         </form>
+        </div>
     </div>
 
     <div class="card">
         <div class="card-head"><h2>📋 FASE FINAL (<?= count($playoffs) ?> partidos)</h2></div>
+        <div class="card-body" style="padding:0;">
         <?php if (empty($playoffs)): ?>
             <p style="text-align:center;padding:30px;color:#aaa;">No hay partidos de fase final registrados.</p>
         <?php else:
             $rondaActual = '';
             foreach ($playoffs as $pf):
                 if ($pf['ronda'] !== $rondaActual):
-                    if ($rondaActual !== '') echo '</tbody></table></div>';
+                    if ($rondaActual !== '') echo '</tbody></table>';
                     $rondaActual = $pf['ronda'];
                     $iconos = ['Octavos de Final'=>'⚔️','Cuartos de Final'=>'🎯','Semifinal'=>'🔥','Tercer Puesto'=>'🥉','Final'=>'🏆'];
                     $icono = $iconos[$rondaActual] ?? '⚽';
         ?>
-            <div style="margin-bottom:24px;">
-            <h3 style="font-family:'Oswald',sans-serif;background:linear-gradient(135deg,<?= $color1 ?>,<?= $color2 ?>);color:#fff;padding:10px 18px;border-radius:8px 8px 0 0;margin:0;font-size:1.1em;letter-spacing:1px;">
+            <h3 style="font-family:'Oswald',sans-serif;background:linear-gradient(135deg,<?= $color1 ?>,<?= $color2 ?>);color:#fff;padding:10px 18px;margin:0;font-size:1.05em;letter-spacing:1px;">
                 <?= $icono ?> <?= htmlspecialchars($rondaActual) ?>
             </h3>
-            <table style="width:100%;border-collapse:collapse;border:2px solid #e2e8f0;border-top:none;">
+            <table style="width:100%;border-collapse:collapse;">
             <thead style="background:#f8f9fa;">
                 <tr>
-                    <th style="padding:10px 14px;text-align:left;font-size:.85em;color:#666;">N°</th>
-                    <th style="padding:10px 14px;text-align:left;font-size:.85em;color:#666;">PARTIDO</th>
-                    <th style="padding:10px 14px;text-align:center;font-size:.85em;color:#666;">RESULTADO</th>
-                    <th style="padding:10px 14px;text-align:center;font-size:.85em;color:#666;">ESTADO</th>
-                    <th style="padding:10px 14px;text-align:center;font-size:.85em;color:#666;">FECHA</th>
-                    <th style="padding:10px 14px;text-align:center;font-size:.85em;color:#666;">ACCIONES</th>
+                    <th style="padding:10px 14px;text-align:left;font-size:.82em;color:#666;font-family:'Oswald',sans-serif;">N°</th>
+                    <th style="padding:10px 14px;text-align:left;font-size:.82em;color:#666;font-family:'Oswald',sans-serif;">PARTIDO</th>
+                    <th style="padding:10px 14px;text-align:center;font-size:.82em;color:#666;font-family:'Oswald',sans-serif;">RESULTADO</th>
+                    <th style="padding:10px 14px;text-align:center;font-size:.82em;color:#666;font-family:'Oswald',sans-serif;">ESTADO</th>
+                    <th style="padding:10px 14px;text-align:center;font-size:.82em;color:#666;font-family:'Oswald',sans-serif;">FECHA</th>
+                    <th style="padding:10px 14px;text-align:center;font-size:.82em;color:#666;font-family:'Oswald',sans-serif;">ACCIONES</th>
                 </tr>
             </thead>
             <tbody>
@@ -656,7 +713,7 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                         <strong><?= htmlspecialchars($pf['equipo_visita']) ?></strong>
                     </td>
                     <td style="padding:12px 14px;text-align:center;font-family:'Oswald',sans-serif;font-size:1.2em;font-weight:700;">
-                        <?= $pf['goles_local'] !== null ? $pf['goles_local'].' - '.$pf['goles_visita'] : '- vs -' ?>
+                        <?= ($pf['goles_local'] !== null) ? $pf['goles_local'].' – '.$pf['goles_visita'] : '– vs –' ?>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
                         <?php
@@ -666,21 +723,25 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                         ?>
                     </td>
                     <td style="padding:12px 14px;text-align:center;font-size:.9em;color:#555;">
-                        <?= $pf['fecha'] ? date('d/m/Y', strtotime($pf['fecha'])) : '-' ?>
+                        <?= $pf['fecha'] ? date('d/m/Y', strtotime($pf['fecha'])) : '–' ?>
                         <?= $pf['hora'] ? '<br>'.substr($pf['hora'],0,5) : '' ?>
                     </td>
                     <td style="padding:12px 14px;text-align:center;">
-                        <a href="?ep=<?= $pf['id'] ?>" class="btn btn-sec" style="font-size:.8em;padding:6px 12px;">✏️</a>
+                        <div class="acts" style="justify-content:center;">
+                        <a href="?ep=<?= $pf['id'] ?>" class="bxs edit">✏️ Editar</a>
                         <form method="POST" action="?panel=fasefinal" style="display:inline;" onsubmit="return confirm('¿Eliminar este partido?')">
                             <input type="hidden" name="accion" value="borrar_playoff">
                             <input type="hidden" name="id"     value="<?= $pf['id'] ?>">
-                            <button type="submit" class="btn btn-dang" style="font-size:.8em;padding:6px 12px;">🗑️</button>
+                            <!-- CORRECCIÓN: era btn-dang (no existe), ahora es bxs del -->
+                            <button type="submit" class="bxs del">🗑️ Borrar</button>
                         </form>
+                        </div>
                     </td>
                 </tr>
         <?php endforeach;
-            if ($rondaActual !== '') echo '</tbody></table></div>';
+            if ($rondaActual !== '') echo '</tbody></table>';
         endif; ?>
+        </div>
     </div>
 </div>
 
@@ -739,7 +800,7 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                         </div>
                     </div>
                     <div class="fg">
-                        <label>Color acento (dorado)</label>
+                        <label>Color acento</label>
                         <div style="display:flex;gap:8px;align-items:center;">
                             <input type="color" id="cp3" value="<?= $cfg['color_accent'] ?? '#d4af37' ?>"
                                 oninput="document.getElementById('tp3').value=this.value"
@@ -749,7 +810,7 @@ body{font-family:'Roboto',sans-serif;background:linear-gradient(135deg,var(--p),
                         </div>
                     </div>
                     <div class="fg">
-                        <label>Color resaltado (rojo)</label>
+                        <label>Color resaltado</label>
                         <div style="display:flex;gap:8px;align-items:center;">
                             <input type="color" id="cp4" value="<?= $cfg['color_highlight'] ?? '#c41e3a' ?>"
                                 oninput="document.getElementById('tp4').value=this.value"
